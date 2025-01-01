@@ -157,9 +157,12 @@ async function getUsedQuotesForDate(date) {
   };
   
   const result = await dynamoDB.scan(params).promise();
-  return result.Items.filter((item) => {
+  const filteredResult =  result.Items.filter((item) => {
     return String(item.DateOfUse) === String(date)}
   );
+  console.log("Filtered Results Length: " + filteredResult.length);
+
+  return filteredResult;
 }
 
 async function getQuoteById(id) {

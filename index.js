@@ -92,8 +92,12 @@ async function getQuoteForToday() {
 
   referenceDate = currentDate;
 
-  const usedQuotes = await getUsedQuotesForDate(currentDate);
+  let usedQuotes = await getUsedQuotesForDate(currentDate);
 
+  usedQuotes = usedQuotes.items.filter((quote) => {
+    return String(quote.NumberID) !== '0';
+  });
+  
   console.log("Used Quotes Length: " + usedQuotes.length);
 
   if (usedQuotes.length > 0) {

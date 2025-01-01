@@ -23,7 +23,7 @@ client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`);
   
   // Schedule the daily quote message
-  schedule.scheduleJob({ hour: 11, minute: 9, tz: timezone }, async () => {
+  schedule.scheduleJob({ hour: 11, minute: 12, tz: timezone }, async () => {
     const channel = client.channels.cache.get(DAILY_CHANNEL_ID);
     if (channel) {
       const quote = await getQuoteForToday();
@@ -177,7 +177,7 @@ async function markQuoteAsUsed(quote, date) {
   const params = {
     TableName: 'UsedQuotesTable',
     Item: {
-      NumberID: String(quote.QuoteID),
+      NumberID: Number(quote.QuoteID),
       DateOfUse: String(date),
     },
   };

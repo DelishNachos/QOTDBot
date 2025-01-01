@@ -1,75 +1,122 @@
-const nacl = require('tweetnacl');
-const AWS = require('aws-sdk');
-const axios = require('axios');
+const { Client, Intents, MessageEmbed } = require('discord.js');
 const schedule = require('node-schedule');
-const { Client, GatewayIntentBits } = require('discord.js');
+const AWS = require('aws-sdk');
 
 const dynamoDB = new AWS.DynamoDB.DocumentClient();
 const timezone = "America/Phoenix";
-const channelId = process.env.CHANNEL_ID; // Channel ID stored in the environment variables
+const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
+const DAILY_CHANNEL_ID = process.env.CHANNEL_ID;
 
-let quote = null;
+const client = new Client({
+  intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES],
+});
+
+let cachedQuote = null;
 let referenceDate = null;
 
-// Initialize Discord Client
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
-
-async function get_random_quote_from_db() {
-  try {
-    const tableName = 'QuoteTable'; // Replace with your actual DynamoDB table name
-    const params = { TableName: tableName };
-
-    const result = await dynamoDB.scan(params).promise();
-    if (!result.Items || result.Items.length === 0) {
-      console.error('No items found in the table.');
-      return null;
+client.once('ready', () => {
+  console.log(`Logged in as ${client.user.tag}!`);
+  
+  // Schedule the daily quote message
+  schedule.scheduleJob({ hour: 10, minute: 25, tz: timezone }, async () => {
+    const channel = client.channels.cache.get(DAILY_CHANNEL_ID);
+    if (channel) {
+      const quote = await getQuoteForToday();
+      if (quote) {
+        await sendQuoteEmbed(channel, quote, false);
+      } else {
+        console.error("Failed to fetch quote for the day.");
+      }
+    } else {
+      console.error("Channel not found for daily quote.");
     }
+  });
+});
 
-    const usedTableName = 'UsedQuotesTable';
-    const usedParms = { TableName: usedTableName };
-    const usedResult = await dynamoDB.scan(usedParms).promise();
-    
-    if (!usedResult.Items) {
-      return null;
+client.on('interactionCreate', async (interaction) => {
+  if (!interaction.isCommand()) return;
+
+  if (interaction.commandName === 'quote') {
+    await interaction.deferReply();
+
+    const quote = await getQuoteForToday();
+
+    if (quote) {
+      const embed = createQuoteEmbed(quote);
+      await interaction.editReply({ embeds: [embed] });
+    } else {
+      await interaction.editReply("No quotes available right now.");
     }
+  } else if (interaction.commandName === 'add_quote') {
+    const quoteText = interaction.options.getString('quote');
+    const author = interaction.options.getString('author') || 'Unknown';
+    const context = interaction.options.getString('context') || null;
+    const date = interaction.options.getString('date') || null;
 
-    const usableQuotes = result.Items.filter((quote) => {
-      return !usedResult.Items.some((usedQuote) => String(usedQuote.NumberID) === String(quote.QuoteID));
-    });
-
-    if (!usableQuotes || usableQuotes.length === 0) {
-      console.error('No usable quotes found.');
-      return null;
-    }
-
-    const randomIndex = Math.floor(Math.random() * usableQuotes.length);
-    const randomQuote = usableQuotes[randomIndex];
-
-    add_used_quote_to_db(randomQuote); // Add the used quote to the database
-
-    return randomQuote;
-  } catch (error) {
-    console.error('Error retrieving item from DynamoDB:', error);
-    return null;
-  }
-}
-
-async function add_used_quote_to_db(quote) {
-  try {
-    const tableName = 'UsedQuotesTable';
-    const params = {
-      TableName: tableName,
-      Item: {
-        "NumberID": Number(quote.QuoteID),
-        "DateOfUse": String(getDateWithoutTime(formatDateInTimezone(new Date(), 'America/Phoenix'))),
-      },
+    const newQuote = {
+      QuoteID: Date.now().toString(),
+      Quote: quoteText,
+      Author: author,
+      Context: context,
+      Date: date,
     };
 
-    await dynamoDB.put(params).promise();
-    console.log('Used Quote added successfully.');
-  } catch (error) {
-    console.error('Error adding used quote to DynamoDB:', error);
+    try {
+      await addQuoteToDB(newQuote);
+      await interaction.reply(`Quote added successfully: "${quoteText}" - ${author}`);
+    } catch (error) {
+      console.error("Error adding quote:", error);
+      await interaction.reply("Failed to add quote.");
+    }
   }
+});
+
+async function getQuoteForToday() {
+  const currentDate = getDateWithoutTime(formatDateInTimezone(new Date(), timezone));
+
+  if (cachedQuote && referenceDate === currentDate) {
+    return cachedQuote;
+  }
+
+  referenceDate = currentDate;
+
+  const usedQuotes = await getUsedQuotesForDate(currentDate);
+
+  if (usedQuotes.length > 0) {
+    const quote = await getQuoteById(usedQuotes[0].NumberID);
+    if (quote) {
+      cachedQuote = quote;
+      return quote;
+    }
+  }
+
+  const randomQuote = await getRandomQuote();
+  if (randomQuote) {
+    await markQuoteAsUsed(randomQuote, currentDate);
+    cachedQuote = randomQuote;
+    return randomQuote;
+  }
+
+  return null;
+}
+
+function createQuoteEmbed(quote) {
+  const embed = new MessageEmbed()
+    .setTitle("Quote of the Day")
+    .setDescription(quote.Quote || "No quote available")
+    .setColor("RANDOM")
+    .addField("Source", quote.Author || "Unknown", false)
+    .addField("Context", quote.Context || "No additional context provided", false)
+    .addField("Date", quote.Date || "Date not available", false)
+    .setFooter("QOTD");
+
+  return embed;
+}
+
+async function sendQuoteEmbed(channel, quote, mentionEveryone = false) {
+  const embed = createQuoteEmbed(quote);
+  const content = mentionEveryone ? "@everyone" : "";
+  await channel.send({ content, embeds: [embed] });
 }
 
 function formatDateInTimezone(date, timezone) {
@@ -82,168 +129,58 @@ function getDateWithoutTime(date) {
   return dateWithoutTime;
 }
 
-async function sendDeferredResponse(id, token) {
-  const url = `https://discord.com/api/v10/interactions/${id}/${token}/callback`;
-  const headers = { "Content-Type": "application/json" };
-  const body = { type: 5 };
-
-  try {
-    await axios.post(url, body, { headers });
-  } catch (error) {
-    console.error("Error sending deferred response:", error);
-  }
-}
-
-async function updateInteractionResponse(app_id, token, tempQuote) {
-  const url = `https://discord.com/api/webhooks/${app_id}/${token}/messages/@original`;
-  const headers = { "Content-Type": "application/json", "User-Agent": "DiscordBot" };
-
-  if (!tempQuote) {
-    const body = { content: "No quotes found in the database." };
-    try {
-      await axios.patch(url, body, { headers });
-    } catch (error) {
-      console.error("Error sending embed response:", error);
-    }
-    return;
-  }
-
-  const embed = {
-    title: "Quote",
-    description: tempQuote.Quote || "No quote available",
-    color: 0xff0000, // Green color
-    fields: [
-      { name: "Source", value: tempQuote.Author || "Unknown", inline: false },
-      { name: "Context", value: tempQuote.Context || "No additional context", inline: false },
-      { name: "Date Quote Was Said", value: tempQuote.Date || "Date not available", inline: false },
-    ],
-    footer: { text: "QOTD" },
+async function getUsedQuotesForDate(date) {
+  const params = {
+    TableName: 'UsedQuotesTable',
   };
 
-  const body = { embeds: [embed] };
-  try {
-    await axios.patch(url, body, { headers });
-  } catch (error) {
-    console.error("Error sending embed response:", error);
-  }
+  const result = await dynamoDB.scan(params).promise();
+  return result.Items.filter((item) => item.DateOfUse === String(date));
 }
 
-async function isNextDay() {
-  const currentDate = formatDateInTimezone(new Date(), 'America/Phoenix');
-  referenceDate = currentDate;
+async function getQuoteById(id) {
+  const params = {
+    TableName: 'QuoteTable',
+    Key: { QuoteID: id },
+  };
 
-  const usedTableName = 'UsedQuotesTable';
-  const usedParms = { TableName: usedTableName };
-  const usedResult = await dynamoDB.scan(usedParms).promise();
-
-  if (!usedResult || usedResult.Items.length === 0) {
-    return;
-  }
-
-  let currentDayQuote = usedResult.Items.filter((quote) => {
-    return String(getDateWithoutTime(new Date(quote.DateOfUse))) === String(getDateWithoutTime(currentDate));
-  });
-
-  if (!currentDayQuote || currentDayQuote.length === 0) {
-    quote = null;
-    return;
-  }
-
-  currentDayQuote = currentDayQuote.filter((quote) => String(quote.NumberID) !== '0');
-  const quoteTableName = "QuoteTable";
-  const quoteParams = { TableName: quoteTableName };
-  const quoteResult = await dynamoDB.scan(quoteParams).promise();
-
-  const newQuote = quoteResult.Items.filter((quote) => String(quote.QuoteID) === String(currentDayQuote[0].NumberID));
-  if (newQuote) {
-    quote = newQuote[0];
-  } else {
-    quote = null;
-  }
+  const result = await dynamoDB.get(params).promise();
+  return result.Item || null;
 }
 
-schedule.scheduleJob({ hour: 10, minute: 0, tz: timezone }, async () => {
-  // Send the scheduled quote message
-  const channel = await client.channels.fetch(channelId);
-  if (channel) {
-    channel.send('/quote');
-  } else {
-    console.error('Channel not found!');
-  }
-});
+async function getRandomQuote() {
+  const allQuotes = await dynamoDB.scan({ TableName: 'QuoteTable' }).promise();
+  const usedQuotes = await dynamoDB.scan({ TableName: 'UsedQuotesTable' }).promise();
 
-client.once('ready', () => {
-  console.log('Bot is online!');
-});
-
-client.login(process.env.BOT_TOKEN); // Login with the bot token stored in environment variable
-
-// Handler to handle Discord interactions (e.g., slash commands)
-exports.handler = async (event) => {
-  const PUBLIC_KEY = process.env.PUBLIC_KEY;
-  const signature = event.headers['x-signature-ed25519'];
-  const timestamp = event.headers['x-signature-timestamp'];
-  const strBody = event.body;
-
-  const isVerified = nacl.sign.detached.verify(
-    Buffer.from(timestamp + strBody),
-    Buffer.from(signature, 'hex'),
-    Buffer.from(PUBLIC_KEY, 'hex')
+  const usableQuotes = allQuotes.Items.filter((quote) =>
+    !usedQuotes.Items.some((used) => String(used.NumberID) === String(quote.QuoteID))
   );
 
-  if (!isVerified) {
-    return { statusCode: 401, body: JSON.stringify('Invalid request signature') };
-  }
+  if (usableQuotes.length === 0) return null;
 
-  const body = JSON.parse(strBody);
-  const id = body.id;
-  const token = body.token;
+  const randomIndex = Math.floor(Math.random() * usableQuotes.length);
+  return usableQuotes[randomIndex];
+}
 
-  if (body.type == 1) {
-    return { statusCode: 200, body: JSON.stringify({ "type": 1 }) };
-  }
+async function markQuoteAsUsed(quote, date) {
+  const params = {
+    TableName: 'UsedQuotesTable',
+    Item: {
+      NumberID: String(quote.QuoteID),
+      DateOfUse: String(date),
+    },
+  };
 
-  if (body.data.name == 'quote') {
-    await sendDeferredResponse(id, token);
-    quote = null;
-    await isNextDay();
+  await dynamoDB.put(params).promise();
+}
 
-    if (quote != null) {
-      await updateInteractionResponse(process.env.BOT_ID, token, quote);
-      return;
-    }
+async function addQuoteToDB(quote) {
+  const params = {
+    TableName: 'QuoteTable',
+    Item: quote,
+  };
 
-    let tempQuote = await get_random_quote_from_db();
-    await updateInteractionResponse(process.env.BOT_ID, token, tempQuote);
-    return;
-  } else if (body.data.name == 'add_quote') {
-    await sendDeferredResponse(id, token);
+  await dynamoDB.put(params).promise();
+}
 
-    const options = body.data.options.reduce((acc, option) => {
-      acc[option.name] = option.value;
-      return acc;
-    }, {});
-
-    const newQuote = {
-      QuoteID: Date.now().toString(),
-      Quote: options.quote,
-      Author: options.source || 'Unknown',
-      Context: options.context || null,
-      Date: options.date || null,
-    };
-
-    try {
-      const tableName = 'QuoteTable';
-      const params = { TableName: tableName, Item: newQuote };
-      await dynamoDB.put(params).promise();
-      await updateInteractionText(process.env.BOT_ID, token, `Quote added successfully:\n"${newQuote.Quote}" - ${newQuote.Author}`);
-      return;
-    } catch (error) {
-      console.error('Error adding quote to DynamoDB:', error);
-      await updateInteractionText(process.env.BOT_ID, token, 'Failed to add quote!');
-      return;
-    }
-  }
-
-  return { statusCode: 404 };
-};
+client.login(DISCORD_TOKEN);

@@ -101,6 +101,7 @@ async function getQuoteForToday() {
   if (usedQuotes.length > 0) {
     console.log("Used Quote ID: " + usedQuotes[0].NumberID);
     const quote = await getQuoteById(usedQuotes[0].NumberID);
+    console.log(quote.Quote);
     if (quote) {
       cachedQuote = quote;
       return quote;

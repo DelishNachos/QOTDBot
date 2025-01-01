@@ -39,7 +39,6 @@ client.once('ready', () => {
 });
 
 client.on('interactionCreate', async (interaction) => {
-  console.log(`Received interaction: ${interaction.commandName}`);
   if (!interaction.isChatInputCommand()) return;
 
   try {
@@ -94,16 +93,14 @@ async function getQuoteForToday() {
 
   const usedQuotes = await getUsedQuotesForDate(currentDate);
 
-  const noZeroUsedQuotes = usedQuotes.items.filter((quote) => {
-    return String(quote.NumberID) !== '0';
-  });
+  
 
   console.log("Used Quotes Length: " + usedQuotes.length);
-  console.log("Used Quotes Length 2: " + noZeroUsedQuotes.length);
 
 
   if (usedQuotes.length > 0) {
-    const quote = await getQuoteById(noZeroUsedQuotes[0].NumberID);
+    console.log("Used Quote ID: " + usedQuotes[0].NumberID);
+    const quote = await getQuoteById(usedQuotes[0].NumberID);
     if (quote) {
       cachedQuote = quote;
       return quote;

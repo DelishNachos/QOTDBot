@@ -4,7 +4,7 @@ const AWS = require('aws-sdk');
 
 const dynamoDB = new AWS.DynamoDB.DocumentClient();
 const timezone = "America/Phoenix";
-const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
+const DISCORD_TOKEN = process.env.BOT_TOKEN;
 const DAILY_CHANNEL_ID = process.env.CHANNEL_ID;
 
 const client = new Client({

@@ -94,6 +94,8 @@ async function getQuoteForToday() {
 
   const usedQuotes = await getUsedQuotesForDate(currentDate);
 
+  console.log("Used Quotes Length: " + usedQuotes.length);
+
   if (usedQuotes.length > 0) {
     const quote = await getQuoteById(usedQuotes[0].NumberID);
     if (quote) {
@@ -147,9 +149,11 @@ async function getUsedQuotesForDate(date) {
   const params = {
     TableName: 'UsedQuotesTable',
   };
-
+  
   const result = await dynamoDB.scan(params).promise();
-  return result.Items.filter((item) => item.DateOfUse === String(date));
+  return result.Items.filter((item) => {
+    return String(item.DateOfUse) === String(date)}
+  );
 }
 
 async function getQuoteById(id) {

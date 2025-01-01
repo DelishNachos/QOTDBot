@@ -1,6 +1,7 @@
 const { Client, GatewayIntentBits, Partials, EmbedBuilder } = require('discord.js');
 const schedule = require('node-schedule');
 const AWS = require('aws-sdk');
+AWS.config.update({ region: 'us-east-2' });
 
 const dynamoDB = new AWS.DynamoDB.DocumentClient();
 const timezone = "America/Phoenix";
@@ -22,7 +23,7 @@ client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`);
   
   // Schedule the daily quote message
-  schedule.scheduleJob({ hour: 10, minute: 56, tz: timezone }, async () => {
+  schedule.scheduleJob({ hour: 11, minute: 2, tz: timezone }, async () => {
     const channel = client.channels.cache.get(DAILY_CHANNEL_ID);
     if (channel) {
       const quote = await getQuoteForToday();

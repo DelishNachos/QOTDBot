@@ -1,4 +1,4 @@
-const { Client, Intents, MessageEmbed } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, EmbedBuilder } = require('discord.js');
 const schedule = require('node-schedule');
 const AWS = require('aws-sdk');
 
@@ -8,7 +8,11 @@ const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const DAILY_CHANNEL_ID = process.env.CHANNEL_ID;
 
 const client = new Client({
-  intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
 });
 
 let cachedQuote = null;
@@ -18,7 +22,7 @@ client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`);
   
   // Schedule the daily quote message
-  schedule.scheduleJob({ hour: 10, minute: 25, tz: timezone }, async () => {
+  schedule.scheduleJob({ hour: 10, minute: 0, tz: timezone }, async () => {
     const channel = client.channels.cache.get(DAILY_CHANNEL_ID);
     if (channel) {
       const quote = await getQuoteForToday();
@@ -34,7 +38,7 @@ client.once('ready', () => {
 });
 
 client.on('interactionCreate', async (interaction) => {
-  if (!interaction.isCommand()) return;
+  if (!interaction.isChatInputCommand()) return;
 
   if (interaction.commandName === 'quote') {
     await interaction.deferReply();
@@ -101,14 +105,16 @@ async function getQuoteForToday() {
 }
 
 function createQuoteEmbed(quote) {
-  const embed = new MessageEmbed()
+  const embed = new EmbedBuilder()
     .setTitle("Quote of the Day")
     .setDescription(quote.Quote || "No quote available")
-    .setColor("RANDOM")
-    .addField("Source", quote.Author || "Unknown", false)
-    .addField("Context", quote.Context || "No additional context provided", false)
-    .addField("Date", quote.Date || "Date not available", false)
-    .setFooter("QOTD");
+    .setColor("Random")
+    .addFields(
+      { name: "Source", value: quote.Author || "Unknown", inline: false },
+      { name: "Context", value: quote.Context || "No additional context provided", inline: false },
+      { name: "Date", value: quote.Date || "Date not available", inline: false }
+    )
+    .setFooter({ text: "QOTD" });
 
   return embed;
 }

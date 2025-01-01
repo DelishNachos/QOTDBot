@@ -172,7 +172,7 @@ async function getQuoteById(id) {
   const filteredResult = result.Items.filter((quote) => {
     return String(quote.QuoteID) === String(id);
   })
-  return filteredResult.Item || null;
+  return filteredResult[0] || null;
 }
 
 async function getRandomQuote() {

@@ -41,38 +41,43 @@ client.once('ready', () => {
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
-  if (interaction.commandName === 'quote') {
-    console.log("Recieved Quote Command");
-    await interaction.deferReply();
+  try {
+    console.log(`Received interaction: ${interaction.commandName}`);
 
-    const quote = await getQuoteForToday();
+    if (interaction.commandName === 'quote') {
+      await interaction.deferReply(); // Acknowledge the interaction
 
-    if (quote) {
-      const embed = createQuoteEmbed(quote);
-      await interaction.editReply({ embeds: [embed] });
-    } else {
-      await interaction.editReply("No quotes available right now.");
-    }
-  } else if (interaction.commandName === 'add_quote') {
-    const quoteText = interaction.options.getString('quote');
-    const author = interaction.options.getString('source') || 'Unknown';
-    const context = interaction.options.getString('context') || null;
-    const date = interaction.options.getString('date') || null;
+      const quote = await getQuoteForToday();
 
-    const newQuote = {
-      QuoteID: Date.now().toString(),
-      Quote: quoteText,
-      Author: author,
-      Context: context,
-      Date: date,
-    };
+      if (quote) {
+        const embed = createQuoteEmbed(quote);
+        await interaction.editReply({ embeds: [embed] });
+      } else {
+        await interaction.editReply("No quotes available right now.");
+      }
+    } else if (interaction.commandName === 'add_quote') {
+      const quoteText = interaction.options.getString('quote');
+      const author = interaction.options.getString('author') || 'Unknown';
+      const context = interaction.options.getString('context') || null;
+      const date = interaction.options.getString('date') || null;
 
-    try {
+      const newQuote = {
+        QuoteID: Date.now().toString(),
+        Quote: quoteText,
+        Author: author,
+        Context: context,
+        Date: date,
+      };
+
       await addQuoteToDB(newQuote);
       await interaction.reply(`Quote added successfully: "${quoteText}" - ${author}`);
-    } catch (error) {
-      console.error("Error adding quote:", error);
-      await interaction.reply("Failed to add quote.");
+    }
+  } catch (error) {
+    console.error("Error handling interaction:", error);
+    if (interaction.deferred || interaction.replied) {
+      await interaction.followUp("An error occurred while processing your request.");
+    } else {
+      await interaction.reply("An error occurred while processing your request.");
     }
   }
 });

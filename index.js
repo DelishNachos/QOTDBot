@@ -22,7 +22,7 @@ client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`);
   
   // Schedule the daily quote message
-  schedule.scheduleJob({ hour: 10, minute: 0, tz: timezone }, async () => {
+  schedule.scheduleJob({ hour: 10, minute: 50, tz: timezone }, async () => {
     const channel = client.channels.cache.get(DAILY_CHANNEL_ID);
     if (channel) {
       const quote = await getQuoteForToday();
@@ -41,6 +41,7 @@ client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   if (interaction.commandName === 'quote') {
+    console.log("Recieved Quote Command");
     await interaction.deferReply();
 
     const quote = await getQuoteForToday();
@@ -77,8 +78,9 @@ client.on('interactionCreate', async (interaction) => {
 
 async function getQuoteForToday() {
   const currentDate = getDateWithoutTime(formatDateInTimezone(new Date(), timezone));
-
+  console.log("Current Date: " + currentDate);
   if (cachedQuote && referenceDate === currentDate) {
+    console.log("CachedQuote");
     return cachedQuote;
   }
 

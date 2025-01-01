@@ -22,7 +22,7 @@ client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`);
   
   // Schedule the daily quote message
-  schedule.scheduleJob({ hour: 10, minute: 50, tz: timezone }, async () => {
+  schedule.scheduleJob({ hour: 10, minute: 56, tz: timezone }, async () => {
     const channel = client.channels.cache.get(DAILY_CHANNEL_ID);
     if (channel) {
       const quote = await getQuoteForToday();
@@ -54,7 +54,7 @@ client.on('interactionCreate', async (interaction) => {
     }
   } else if (interaction.commandName === 'add_quote') {
     const quoteText = interaction.options.getString('quote');
-    const author = interaction.options.getString('author') || 'Unknown';
+    const author = interaction.options.getString('source') || 'Unknown';
     const context = interaction.options.getString('context') || null;
     const date = interaction.options.getString('date') || null;
 

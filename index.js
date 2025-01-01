@@ -23,7 +23,7 @@ client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`);
   
   // Schedule the daily quote message
-  schedule.scheduleJob({ hour: 11, minute: 2, tz: timezone }, async () => {
+  schedule.scheduleJob({ hour: 11, minute: 7, tz: timezone }, async () => {
     const channel = client.channels.cache.get(DAILY_CHANNEL_ID);
     if (channel) {
       const quote = await getQuoteForToday();
@@ -150,11 +150,13 @@ async function getUsedQuotesForDate(date) {
 async function getQuoteById(id) {
   const params = {
     TableName: 'QuoteTable',
-    Key: { QuoteID: id },
   };
 
   const result = await dynamoDB.get(params).promise();
-  return result.Item || null;
+  const filteredResult = result.Items.filter((quote) => {
+    return String(quote.QuoteID) === String(id);
+  })
+  return filteredResult.Item || null;
 }
 
 async function getRandomQuote() {

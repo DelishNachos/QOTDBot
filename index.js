@@ -39,10 +39,10 @@ client.once('ready', () => {
 });
 
 client.on('interactionCreate', async (interaction) => {
+  console.log(`Received interaction: ${interaction.commandName}`);
   if (!interaction.isChatInputCommand()) return;
 
   try {
-    console.log(`Received interaction: ${interaction.commandName}`);
 
     if (interaction.commandName === 'quote') {
       await interaction.deferReply(); // Acknowledge the interaction

@@ -6,7 +6,7 @@ AWS.config.update({ region: 'us-east-2' });
 const dynamoDB = new AWS.DynamoDB.DocumentClient();
 const timezone = "America/Phoenix";
 const DISCORD_TOKEN = process.env.BOT_TOKEN;
-const DAILY_CHANNEL_ID = process.env.CHANNEL_ID;
+const CHANNEL_ID = process.env.CHANNEL_ID;
 
 const client = new Client({
   intents: [
@@ -24,7 +24,7 @@ client.once('ready', () => {
   console.log('Channel ID: ' + CHANNEL_ID);
   // Schedule the daily quote message
   schedule.scheduleJob({ hour: 0, minute: 0, tz: timezone }, async () => {
-    const channel = client.channels.cache.get(DAILY_CHANNEL_ID);
+    const channel = CHANNEL_ID;//client.channels.cache.get(DAILY_CHANNEL_ID);
     if (channel) {
       const quote = await getQuoteForToday();
       if (quote) {

@@ -21,7 +21,7 @@ let referenceDate = null;
 
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`);
-  
+  console.log('Channel ID: ' + CHANNEL_ID);
   // Schedule the daily quote message
   schedule.scheduleJob({ hour: 0, minute: 0, tz: timezone }, async () => {
     const channel = client.channels.cache.get(DAILY_CHANNEL_ID);

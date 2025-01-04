@@ -28,7 +28,7 @@ client.once('ready', () => {
     if (channel) {
       const quote = await getQuoteForToday();
       if (quote) {
-        await sendQuoteEmbed(channel, quote, true);
+        await sendQuoteEmbed(channel, quote, false);
       } else {
         console.error("Failed to fetch quote for the day.");
       }

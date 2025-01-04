@@ -23,8 +23,8 @@ client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`);
   console.log('Channel ID: ' + CHANNEL_ID);
   // Schedule the daily quote message
-  schedule.scheduleJob({ hour: 16, minute: 0, tz: timezone }, async () => {
-    const channel = CHANNEL_ID;//client.channels.cache.get(DAILY_CHANNEL_ID);
+  schedule.scheduleJob({ hour: 16, minute: 3, tz: timezone }, async () => {
+    const channel = client.channels.cache.get(CHANNEL_ID);
     if (channel) {
       const quote = await getQuoteForToday();
       if (quote) {

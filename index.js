@@ -1,7 +1,12 @@
+require('dotenv').config();
+
 const { Client, GatewayIntentBits, Partials, EmbedBuilder } = require('discord.js');
 const schedule = require('node-schedule');
 const AWS = require('aws-sdk');
-AWS.config.update({ region: 'us-east-2' });
+
+AWS.config.update({
+    region: process.env.AWS_REGION,
+});
 
 const dynamoDB = new AWS.DynamoDB.DocumentClient();
 const timezone = "America/Phoenix";
